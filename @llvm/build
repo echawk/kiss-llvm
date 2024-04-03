@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/sh -ex
 
 export DESTDIR="$1"
 export LD_LIBRARY_PATH="$1/usr/lib:$LD_LIBRARY_PATH"
@@ -7,8 +7,10 @@ export LDFLAGS="-L$1/usr/lib $LDFLAGS"
 export CFLAGS="-I$1/usr/include $CFLAGS"
 export CXXFLAGS="-I$1/usr/include $CXXFLAGS"
 
-sed -i 's/set(COMPILER_RT_HAS_SANITIZER_COMMON TRUE)/set(COMPILER_RT_HAS_SANITIZER_COMMON FALSE)/' compiler-rt/cmake/config-ix.cmake
-sed -i 's/!defined(_GCC_MAX_ALIGN_T)/& \&\& !defined(__DEFINED_max_align_t)/' libcxx/include/stddef.h
+#sed -i 's/set(COMPILER_RT_HAS_SANITIZER_COMMON TRUE)/set(COMPILER_RT_HAS_SANITIZER_COMMON FALSE)/' compiler-rt/cmake/config-ix.cmake
+#sed -i 's/!defined(_GCC_MAX_ALIGN_T)/& \&\& !defined(__DEFINED_max_align_t)/' libcxx/include/stddef.h
+
+VER="${2%%.*}"
 
 cmake -B build \
     -DCMAKE_INSTALL_PREFIX=/usr \
@@ -18,12 +20,19 @@ cmake -B build \
     -DLLVM_TARGETS_TO_BUILD="host" \
     -DLLVM_ENABLE_RTTI=ON \
     -DLLVM_HOST_TRIPLE="$(cc -dumpmachine)" \
+    -DLLVM_BUILD_BENCHMARKS=OFF \
+    -DLLVM_INCLUDE_BENCHMARKS=OFF \
     -DLLVM_BUILD_EXAMPLES=OFF \
+    -DLLVM_INCLUDE_EXAMPLES=OFF \
     -DLLVM_BUILD_DOCS=OFF \
+    -DLLVM_INCLUDE_DOCS=OFF \
     -DLLVM_BUILD_TESTS=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF \
     -DLLVM_ENABLE_TERMINFO=OFF \
     -DLLVM_ENABLE_LIBXML2=OFF \
     -DLLVM_ENABLE_LIBEDIT=OFF \
+    -DLLVM_ENABLE_ZSTD=OFF \
+    -DLLVM_ENABLE_ZLIB=ON \
     -Wno-dev llvm
 
 cmake --build build
@@ -41,7 +50,18 @@ cmake -B build \
     -DCLANG_INCLUDE_DOCS=OFF \
     -DCLANG_INCLUDE_TESTS=OFF \
     -DLIBCLANG_BUILD_STATIC=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF \
     -Wno-dev clang
+
+cmake --build build
+cmake --install build
+
+rm -rf build
+
+cmake -B build \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_BUILD_TYPE=Release \
+    -Wno-dev runtimes
 
 cmake --build build
 cmake --install build
@@ -51,25 +71,27 @@ rm -rf build
 # Building compiler-rt in GCC always results in segmentation fault.
 # Use clang for now.
 cmake -B build \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_BUILD_TYPE=Release \
-    compiler-rt
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCOMPILER_RT_INSTALL_PATH="/usr/lib/clang/$VER/" \
+    -DCOMPILER_RT_BUILD_BUILTINS=ON \
+    -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+    -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+    -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
+    -Wno-dev compiler-rt
 
 cmake --build   build
 cmake --install build
 
-mkdir -p "$1/usr/lib/clang/$2/lib"
-mv "$1/usr/lib/linux" "$1/usr/lib/clang/$2/lib"
-
 rm -rf build
 
 cmake -B build \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DLIBUNWIND_USE_COMPILER_RT=ON \
     -Wno-dev libunwind
 
@@ -83,10 +105,11 @@ cmake -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
+    -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
     -DLIBCXXABI_LIBCXX_INCLUDES=libcxx/include \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
-    libcxxabi
+    -Wno-dev libcxxabi
 
 cmake --build build
 cmake --install build
@@ -102,11 +125,13 @@ cmake -B build \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+    -DLIBCXX_INCLUDE_TESTS=OFF \
+    -DLIBCXX_INCLUDE_BENCHMARKS=OFF \
     -DLIBCXX_CXX_ABI=libcxxabi \
     -DLIBCXX_USE_COMPILER_RT=ON \
     -DLIBCXX_HAS_MUSL_LIBC=ON \
     -DLIBCXX_HAS_ATOMIC_LIB=OFF \
-    libcxx
+    -Wno-dev libcxx
 
 cmake --build build
 cmake --install build
