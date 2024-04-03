@@ -80,6 +80,8 @@ cmake -B build \
     -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
     -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
     -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
+    -DCOMPILER_RT_BUILD_XRAY=OFF \
+    -DCOMPILER_RT_BUILD_MEMPROF=OFF \
     -Wno-dev compiler-rt
 
 cmake --build   build
@@ -108,6 +110,7 @@ cmake -B build \
     -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
     -DLIBCXXABI_LIBCXX_INCLUDES=libcxx/include \
     -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
+    -DLIBCXXABI_ENABLE_STATIC_UNWINDER=OFF \
     -DLIBCXXABI_USE_COMPILER_RT=ON \
     -Wno-dev libcxxabi
 
